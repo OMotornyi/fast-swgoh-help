@@ -25,12 +25,16 @@ async def main():
     guild = await swgoh_api.fetch_guilds([928428534])
     #print(guild)
     codes = [x['allyCode'] for x in guild[0]['roster']]
+    for code in codes[:]:
+        print(code)
+        tasks.append(swgoh_api.fetch_players([code]))
+    guild_players = await asyncio.gather(*tasks, return_exceptions=False)
+    tasks = []
     for code in codes:
         print(code)
         tasks.append(swgoh_api.fetch_players([code]))
-    for code in codes:
-        print(code)
-        tasks.append(swgoh_api.fetch_players([code]))
+    guild_players = await asyncio.gather(*tasks, return_exceptions=False)
+    tasks = []
     for code in codes:
         print(code)
         tasks.append(swgoh_api.fetch_players([code]))

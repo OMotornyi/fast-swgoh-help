@@ -12,8 +12,9 @@ from aiohttp.web_exceptions import HTTPError
 
 class HelpAPI:
     SWGOH_HELP = 'https://api.swgoh.help'
-    RATE = 1.5
-    MAX_TOKENS = 5
+    RATE = 60
+    MAX_TOKENS = 40
+    #INTERVAL = 1.5
 
     def __init__(self):
         self.session = aiohttp.ClientSession()
@@ -25,6 +26,8 @@ class HelpAPI:
         self.tokens = self.MAX_TOKENS
         self.updated_at = time.monotonic()
         self.response_count = 0
+        self.last_call = time.monotonic()
+        self.sem = asyncio.Semaphore(6)
 
 
     async def ai_get_access_token(self):
@@ -57,7 +60,8 @@ class HelpAPI:
 
         self.config['swgoh.help']['access_token'] = data['access_token']
         self.config['swgoh.help']['access_token_expire'] = datetime.now() + timedelta(seconds=data['expires_in'])
-
+        # with open("../CONFIGURE.json", 'w') as json_file:
+        #    json.dump(self.config, json_file)
         return self.config['swgoh.help']['access_token']
 
     async def get_headers(self):
@@ -136,14 +140,22 @@ class HelpAPI:
         return result
 
     async def aiohttp_post(self, url, *args, **kwargs):
-        print(f"Tokens:{self.tokens} updated at: {self.updated_at}")
+        #print(f"Tokens:{self.tokens} updated at: {self.updated_at}")
         await self.wait_for_token()
-        print(f"Tokens:{self.tokens} updated at: {self.updated_at}")
+        #print(f"Tokens:{self.tokens} updated at: {self.updated_at}")
+        time_d = time.monotonic()-self.last_call
+        print(f"Time since last API CALL {time_d}")
+        #if time_d < self.INTERVAL:
+        #    await asyncio.sleep(time_d)
+        self.last_call = time.monotonic()
         try:
-            async with self.session.post(url, *args, **kwargs) as response:
-                if response.status not in [200, 404]:
-                    response.raise_for_status()
-                data = await response.json()
+            async with self.sem:
+                async with self.session.post(url, *args, **kwargs) as response:
+                    if response.status not in [200, 404]:
+                        response.raise_for_status()
+                    data = await response.json()
+                    #print(response.headers)
+                    print(f"Limit: {response.headers['X-RateLimit-Limit']}, Remains: {response.headers['X-RateLimit-Remaining']}, Reset: {response.headers['X-RateLimit-Reset']}")
 
         except HTTPError as http_err:
             return (None, 'HTTP error occured: %s' % http_err)
