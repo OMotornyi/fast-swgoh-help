@@ -19,36 +19,39 @@ async def main():
     #await asyncio.gather(*tasks)
     #return token
     swgoh_api = HelpAPI()
-    print(swgoh_api.config)
+    #print(swgoh_api.config)
     print(swgoh_api.session)
-    #await swgoh_api.ai_get_access_token()
-    guild = await swgoh_api.fetch_guilds([928428534])
-    #print(guild)
-    codes = [x['allyCode'] for x in guild[0]['roster']]
-    for code in codes[:]:
-        print(code)
-        tasks.append(swgoh_api.fetch_players([code]))
-    guild_players = await asyncio.gather(*tasks, return_exceptions=False)
-    tasks = []
-    for code in codes:
-        print(code)
-        tasks.append(swgoh_api.fetch_players([code]))
-    guild_players = await asyncio.gather(*tasks, return_exceptions=False)
-    tasks = []
-    for code in codes:
-        print(code)
-        tasks.append(swgoh_api.fetch_players([code]))
-    guild_players = await asyncio.gather(*tasks,return_exceptions=False)
-    print(len(guild_players))
-    #for gp in guild_players:
-    #    print(gp)
-    #guild = await swgoh_api.fetch_guilds([928428534])
+
+    #r = await swgoh_api.shitty_players(282392964)
+    await swgoh_api.get_data()
+    #print("ERROR:",e)
+    #print("RESPONSE", r)
+
+    # guild = await swgoh_api.fetch_guilds([928428534])
+    #
+    # codes = [x['allyCode'] for x in guild[0]['roster']]
+    # for code in codes[:]:
+    #     print(code)
+    #     tasks.append(swgoh_api.fetch_players([code]))
+    # guild_players = await asyncio.gather(*tasks, return_exceptions=False)
+    # tasks = []
+    # for code in codes:
+    #     print(code)
+    #     tasks.append(swgoh_api.fetch_players([code]))
+    # guild_players = await asyncio.gather(*tasks, return_exceptions=False)
+    # tasks = []
+    # for code in codes:
+    #     print(code)
+    #     tasks.append(swgoh_api.fetch_players([code]))
+    # guild_players = await asyncio.gather(*tasks,return_exceptions=False)
+    # print(len(guild_players))
+
 
     #print(guild)
     print(swgoh_api.config)
     print(swgoh_api.session)
-    await swgoh_api.session.close()
-    return guild
+    #await swgoh_api.session.close()
+    #return guild
 
 if __name__ == '__main__':
     guild = asyncio.run(main())
