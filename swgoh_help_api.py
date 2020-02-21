@@ -7,27 +7,66 @@ from os import path
 from datetime import datetime, timedelta
 import time
 from aiohttp.web_exceptions import HTTPError
+import atexit
+from functools import partial
 #from utils2 import aiohttp_post
 
 
 class HelpAPI:
     SWGOH_HELP = 'https://api.swgoh.help'
+    SHITTYBOTS = "https://swgoh.shittybots.me/api/"
     RATE = 60
     MAX_TOKENS = 40
+
     #INTERVAL = 1.5
+    #def some_f(self):
 
     def __init__(self):
-        self.session = aiohttp.ClientSession()
+
         if path.isfile("../CONFIGURE.json"):
             with open("../CONFIGURE.json") as json_file:
                 self.config = json.load(json_file)
         else:
             print("File does not exist")
+        #print(self.config)
+        self.session = aiohttp.ClientSession(headers={"shittybot": self.config["shittybot"]})
+#           atexit.register(asyncio.new_event_loop().run_until_complete(self.session.close()))
+        atexit.register(
+            partial(
+                asyncio.new_event_loop().run_until_complete,
+                self.session.close(),
+            )
+        )
         self.tokens = self.MAX_TOKENS
         self.updated_at = time.monotonic()
         self.response_count = 0
         self.last_call = time.monotonic()
         self.sem = asyncio.Semaphore(6)
+
+    # async def __aexit__(self, *excinfo):
+    #     await self.session.close()
+
+
+    async def shitty_players(self, allycode, **kwargs):
+        url = f"{self.SHITTYBOTS}player/{allycode}"
+        player = await self.call_shitty_api(url)
+        return player
+
+    async def get_data(self):
+        if path.isfile("data_lists.json"):
+            with open("data_lists.json") as data_file:
+                data_list = json.load(data_file)
+        else:
+            print("File does not exist")
+        tasks = []
+        for data in data_list[:1]:
+            url = f"{self.SHITTYBOTS}data/{data}.json"
+            tasks.append(self.call_shitty_api(url))
+        responses = await asyncio.gather(*tasks)
+        for index, data in enumerate(data_list[:1]):
+            with open(f"{data}.json", 'w') as data_file:
+               json.dump(responses[index], data_file)
+
 
 
     async def ai_get_access_token(self):
@@ -76,6 +115,23 @@ class HelpAPI:
         headers =await self.get_headers()
         #async with self.session:
         response, error = await self.aiohttp_post(url, headers=headers, json=project)
+        if error:
+            raise Exception(f'http_post({url}) failed: {error}')
+
+        try:
+            data = await response.json()
+
+        except Exception as err:
+            print("Failed to decode JSON:\n%s\n---" % response.content)
+            raise err
+
+        if 'error' in data and 'error_description' in data:
+            raise Exception(data['error_description'])
+
+        return data
+
+    async def call_shitty_api(self, url):
+        response, error = await self.aiohttp_get(url)
         if error:
             raise Exception(f'http_post({url}) failed: {error}')
 
@@ -151,6 +207,29 @@ class HelpAPI:
         try:
             async with self.sem:
                 async with self.session.post(url, *args, **kwargs) as response:
+                    if response.status not in [200, 404]:
+                        response.raise_for_status()
+                    data = await response.json()
+                    #print(response.headers)
+                    print(f"Limit: {response.headers['X-RateLimit-Limit']}, Remains: {response.headers['X-RateLimit-Remaining']}, Reset: {response.headers['X-RateLimit-Reset']}")
+
+        except HTTPError as http_err:
+            return (None, 'HTTP error occured: %s' % http_err)
+
+        except Exception as err:
+            return (None, 'Other error occured: %s' % err)
+
+        else:
+            self.response_count += 1
+            print(self.response_count)
+            return response, False
+
+    async def aiohttp_get(self, url, **kwargs):
+
+        print(url)
+        try:
+            async with self.sem:
+                async with self.session.get(url, **kwargs) as response:
                     if response.status not in [200, 404]:
                         response.raise_for_status()
                     data = await response.json()
